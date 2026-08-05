@@ -55,7 +55,6 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
     DELETE FROM zgr_material.
     DELETE FROM zgr_supplier.
     DELETE FROM zgr_dev_reason.
-
     COMMIT WORK.
   ENDMETHOD.
 

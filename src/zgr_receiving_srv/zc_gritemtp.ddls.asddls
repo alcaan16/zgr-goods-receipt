@@ -1,5 +1,5 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'Entrada de mercancia-Posicion-Proyeccion'
+@EndUserText.label: 'Posicion de entrada - Proyeccion'
 @Metadata.allowExtensions: true
 define view entity ZC_GRItemTP
   as projection on ZR_GRItemTP

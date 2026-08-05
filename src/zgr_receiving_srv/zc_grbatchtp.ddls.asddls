@@ -1,5 +1,5 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'Entrada de mercancia-Lote-Proyeccion'
+@EndUserText.label: 'Entrada de mercancia - Lote - Proyeccion'
 @Metadata.allowExtensions: true
 define view entity ZC_GRBatchTP
   as projection on ZR_GRBatchTP
