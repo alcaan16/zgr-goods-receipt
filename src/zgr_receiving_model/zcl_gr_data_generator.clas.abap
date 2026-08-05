@@ -45,6 +45,7 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
 
   METHOD clear_all.
+    DELETE FROM zgr_uom.
     DELETE FROM zgr_batch_d.
     DELETE FROM zgr_rec_item_d.
     DELETE FROM zgr_receipt_d.
@@ -60,6 +61,15 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
 
   METHOD fill_master_data.
+
+    DATA uoms TYPE STANDARD TABLE OF zgr_uom WITH EMPTY KEY.
+    uoms = VALUE #(
+      ( uom_code = 'ST' description = 'Unidades / piezas'  uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'CAJ' description = 'Cajas'             uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'PAL' description = 'Palets'            uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'KG' description = 'Kilogramos'         uom_type = 'P' is_active = abap_true )
+      ( uom_code = 'G'  description = 'Gramos'             uom_type = 'P' is_active = abap_true ) ).
+
 
     DATA suppliers TYPE STANDARD TABLE OF zgr_supplier WITH EMPTY KEY.
     suppliers = VALUE #(
@@ -100,6 +110,7 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
       ( reason_id = 'R004' description = 'Diferencia de conteo de unidades'   is_active = abap_true )
       ( reason_id = 'R005' description = 'Documento de entrada incorrecto'    is_active = abap_true ) ).
 
+    INSERT zgr_uom        FROM TABLE @uoms.
     INSERT zgr_supplier   FROM TABLE @suppliers.
     INSERT zgr_material   FROM TABLE @materials.
     INSERT zgr_dev_reason FROM TABLE @reasons.

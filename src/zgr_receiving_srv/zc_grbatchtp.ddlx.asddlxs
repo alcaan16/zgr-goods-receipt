@@ -22,8 +22,16 @@ annotate entity ZC_GRBatchTP with
   @UI.hidden: true
   ReceiptUuid;
 
-  @UI: { lineItem:       [ { position: 10, label: 'Lote interno' } ],
-         identification: [ { position: 10, label: 'Lote interno' } ] }
+  @UI: { lineItem:       [ { position: 10, label: 'Lote interno' },
+                           { type: #FOR_ACTION, dataAction: 'blockBatch',
+                             label: 'Bloquear lote' },
+                           { type: #FOR_ACTION, dataAction: 'releaseBatch',
+                             label: 'Liberar lote' } ],
+         identification: [ { position: 10, label: 'Lote interno' },
+                           { type: #FOR_ACTION, dataAction: 'blockBatch',
+                             label: 'Bloquear lote' },
+                           { type: #FOR_ACTION, dataAction: 'releaseBatch',
+                             label: 'Liberar lote' } ] }
   BatchNumber;
 
   @UI: { lineItem:       [ { position: 20, label: 'Lote proveedor' } ],

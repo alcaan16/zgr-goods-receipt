@@ -10,6 +10,8 @@ define behavior for ZC_GRReceiptTP alias Receipt
 
   use association _Item { create; with draft; }
 
+  use action postReceipt;
+
   use action Activate;
   use action Discard;
   use action Edit;
@@ -24,6 +26,8 @@ define behavior for ZC_GRItemTP alias Item
 
   use association _Receipt { with draft; }
   use association _Batch { create; with draft; }
+
+  use action acceptDeviation;
 }
 
 define behavior for ZC_GRBatchTP alias Batch
@@ -34,4 +38,6 @@ define behavior for ZC_GRBatchTP alias Batch
   use association _Item { with draft; }
   use association _Receipt { with draft; }
 
+  use action blockBatch;
+  use action releaseBatch;
 }

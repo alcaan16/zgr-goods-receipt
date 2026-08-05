@@ -7,7 +7,7 @@ persistent table zgr_receipt
 draft table zgr_receipt_d
 lock master
 total etag LastChangedAt
-authorization master ( instance )
+authorization master ( instance, global )
 etag master LocalLastChangedAt
 {
   field ( numbering : managed, readonly ) ReceiptUuid;
@@ -25,6 +25,8 @@ etag master LocalLastChangedAt
   determination setReceiptNumber on save { create; }
 
   validation validateSupplier on save { create; field SupplierId; }
+
+  action ( features : instance ) postReceipt result [1] $self;
 
   draft action Activate optimized;
   draft action Discard;
@@ -66,12 +68,12 @@ define behavior for ZR_GRItemTP alias Item
 persistent table zgr_rec_item
 draft table zgr_rec_item_d
 lock dependent by _Receipt
-authorization dependent by _Receipt
+authorization master ( instance, global )
 etag master LocalLastChangedAt
 {
   field ( numbering : managed, readonly ) ItemUuid;
-  field ( readonly ) ReceiptUuid, QtyDeviation, WeightDeviation, DeviationPct,
-                     ItemStatus, LocalLastChangedAt;
+  field ( readonly ) ReceiptUuid, ItemNumber, QtyDeviation, WeightDeviation,
+                     DeviationPct, ItemStatus, LocalLastChangedAt;
   field ( mandatory ) MaterialId, QtyExpected, QtyReceived;
 
   update;
@@ -80,6 +82,7 @@ etag master LocalLastChangedAt
   association _Receipt { with draft; }
   association _Batch { create; with draft; }
 
+  determination setItemNumber on modify { create; }
   determination calculateDeviation on modify
     { create; field QtyExpected, WeightExpected, QtyReceived, WeightReceived; }
   determination calculateHeaderTotals on save { create; update; }
@@ -90,6 +93,9 @@ etag master LocalLastChangedAt
   validation validateWeightPlausibility on save
     { create; field MaterialId, QtyReceived, WeightReceived; }
   validation validateBatchQuantities on save { create; update; }
+
+  action ( features : instance ) acceptDeviation
+    parameter ZD_GRAcceptDeviation result [1] $self;
 
   mapping for zgr_rec_item
   {
@@ -117,7 +123,7 @@ define behavior for ZR_GRBatchTP alias Batch
 persistent table zgr_batch
 draft table zgr_batch_d
 lock dependent by _Receipt
-authorization dependent by _Receipt
+authorization master ( instance, global )
 etag master LocalLastChangedAt
 {
   field ( numbering : managed, readonly ) BatchUuid;
@@ -136,6 +142,9 @@ etag master LocalLastChangedAt
 
   validation validateExpiryDate on save { create; field ProductionDate; }
   validation validateSupplierBatch on save { create; field SupplierBatch; }
+
+  action ( features : instance ) blockBatch result [1] $self;
+  action ( features : instance ) releaseBatch result [1] $self;
 
   mapping for zgr_batch
   {

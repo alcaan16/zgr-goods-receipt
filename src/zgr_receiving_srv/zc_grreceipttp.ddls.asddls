@@ -24,8 +24,10 @@ define root view entity ZC_GRReceiptTP
       OverallStatus,
 
       TotalQuantity,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZI_GRUnitOfMeasure', element: 'UomCode' } }]
       TotalUnit,
       TotalWeight,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZI_GRUnitOfMeasure', element: 'UomCode' } }]
       WeightUnit,
 
       CreatedBy,

@@ -38,6 +38,9 @@ CLASS lhc_Receipt DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
   PRIVATE SECTION.
 
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING REQUEST requested_authorizations FOR Receipt RESULT result.
+
     METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
       IMPORTING keys REQUEST requested_authorizations FOR Receipt RESULT result.
 
@@ -50,14 +53,47 @@ CLASS lhc_Receipt DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS validateSupplier FOR VALIDATE ON SAVE
       IMPORTING keys FOR Receipt~validateSupplier.
 
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING keys REQUEST requested_features FOR Receipt RESULT result.
+
+    METHODS postReceipt FOR MODIFY
+      IMPORTING keys FOR ACTION Receipt~postReceipt RESULT result.
+
 ENDCLASS.
 
 
 CLASS lhc_Receipt IMPLEMENTATION.
 
-  METHOD get_instance_authorizations.
-    " Sin DCL: el proyecto no implementa control de autorizaciones.
+  METHOD get_global_authorizations.
+
+    " Sin DCL: el proyecto no implementa control de autorizaciones. Los
+    " manejadores conceden todo de forma explicita, que es distinto de no
+    " implementarlos: RAP exige una respuesta, no el silencio.
     " Decision de alcance documentada en docs/decisiones-tecnicas.md.
+    result-%create             = if_abap_behv=>auth-allowed.
+    result-%update             = if_abap_behv=>auth-allowed.
+    result-%delete             = if_abap_behv=>auth-allowed.
+    result-%action-postReceipt = if_abap_behv=>auth-allowed.
+
+  ENDMETHOD.
+
+
+  METHOD get_instance_authorizations.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt
+        FIELDS ( ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(receipts).
+
+    " Posiciones y lotes declaran su propia autorizacion: RAP exige un
+    " manejador en la entidad sobre la que se comprueba la accion.
+    result = VALUE #( FOR receipt IN receipts
+                      ( %tky                = receipt-%tky
+                        %update             = if_abap_behv=>auth-allowed
+                        %delete             = if_abap_behv=>auth-allowed
+                        %action-postReceipt = if_abap_behv=>auth-allowed ) ).
+
   ENDMETHOD.
 
 
@@ -172,12 +208,79 @@ CLASS lhc_Receipt IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD get_instance_features.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt
+        FIELDS ( OverallStatus )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(receipts).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt BY \_Item
+        FIELDS ( ItemStatus )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items)
+      LINK DATA(item_links).
+
+    LOOP AT receipts INTO DATA(receipt).
+
+      " Una entrada ya registrada no se vuelve a registrar
+      DATA(can_post) = xsdbool( receipt-OverallStatus <> lcl_const=>receipt_status-posted ).
+
+      " Y no se registra mientras haya discrepancias sin resolver:
+      " esa decision la toma una persona, no el sistema
+      IF can_post = abap_true.
+        LOOP AT item_links INTO DATA(link) WHERE source-%tky = receipt-%tky.
+          READ TABLE items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+          CHECK sy-subrc = 0.
+          IF item-ItemStatus = lcl_const=>item_status-deviation.
+            can_post = abap_false.
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      APPEND VALUE #( %tky = receipt-%tky
+                      %action-postReceipt = COND #( WHEN can_post = abap_true
+                                                    THEN if_abap_behv=>fc-o-enabled
+                                                    ELSE if_abap_behv=>fc-o-disabled ) )
+             TO result.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD postReceipt.
+
+    MODIFY ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt
+        UPDATE FIELDS ( OverallStatus )
+        WITH VALUE #( FOR key IN keys
+                      ( %tky          = key-%tky
+                        OverallStatus = lcl_const=>receipt_status-posted ) )
+      REPORTED DATA(update_reported).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt
+        ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(receipts).
+
+    result = VALUE #( FOR receipt IN receipts
+                      ( %tky = receipt-%tky %param = receipt ) ).
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
 CLASS lhc_Item DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
   PRIVATE SECTION.
+
+    METHODS setItemNumber FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR Item~setItemNumber.
 
     METHODS calculateDeviation FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Item~calculateDeviation.
@@ -197,10 +300,71 @@ CLASS lhc_Item DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS validateBatchQuantities FOR VALIDATE ON SAVE
       IMPORTING keys FOR Item~validateBatchQuantities.
 
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING REQUEST requested_authorizations FOR Item RESULT result.
+
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested_authorizations FOR Item RESULT result.
+
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING keys REQUEST requested_features FOR Item RESULT result.
+
+    METHODS acceptDeviation FOR MODIFY
+      IMPORTING keys FOR ACTION Item~acceptDeviation RESULT result.
+
 ENDCLASS.
 
 
 CLASS lhc_Item IMPLEMENTATION.
+
+  METHOD setItemNumber.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( ItemNumber )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(new_items).
+
+    DELETE new_items WHERE ItemNumber IS NOT INITIAL.
+    CHECK new_items IS NOT INITIAL.
+
+    " Numeracion de 10 en 10, como en cualquier documento de SAP: deja hueco
+    " para intercalar una posicion sin renumerar el resto.
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item BY \_Receipt
+        FIELDS ( ReceiptUuid )
+        WITH CORRESPONDING #( new_items )
+      RESULT DATA(receipts).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt BY \_Item
+        FIELDS ( ItemNumber )
+        WITH CORRESPONDING #( receipts )
+      RESULT DATA(sibling_items).
+
+    DATA(highest) = REDUCE i( INIT max = 0
+                              FOR sibling IN sibling_items
+                              NEXT max = COND #( WHEN sibling-ItemNumber > max
+                                                 THEN sibling-ItemNumber
+                                                 ELSE max ) ).
+
+    DATA updates TYPE TABLE FOR UPDATE zr_grreceipttp\\Item.
+
+    LOOP AT new_items INTO DATA(new_item).
+      highest = highest + 10.
+      APPEND VALUE #( %tky       = new_item-%tky
+                      ItemNumber = highest )
+             TO updates.
+    ENDLOOP.
+
+    MODIFY ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        UPDATE FIELDS ( ItemNumber )
+        WITH updates
+      REPORTED DATA(update_reported).
+
+  ENDMETHOD.
+
 
   METHOD calculateDeviation.
 
@@ -547,6 +711,83 @@ CLASS lhc_Item IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD get_global_authorizations.
+
+    result-%update                 = if_abap_behv=>auth-allowed.
+    result-%delete                 = if_abap_behv=>auth-allowed.
+    result-%action-acceptDeviation = if_abap_behv=>auth-allowed.
+
+  ENDMETHOD.
+
+
+  METHOD get_instance_authorizations.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( ItemUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(authorized_items).
+
+    result = VALUE #( FOR item IN authorized_items
+                      ( %tky                    = item-%tky
+                        %update                 = if_abap_behv=>auth-allowed
+                        %delete                 = if_abap_behv=>auth-allowed
+                        %action-acceptDeviation = if_abap_behv=>auth-allowed ) ).
+
+  ENDMETHOD.
+
+
+  METHOD get_instance_features.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( ItemStatus )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    " Un boton que no hace nada es ruido: solo se ofrece aceptar la
+    " desviacion cuando efectivamente hay una desviacion pendiente
+    result = VALUE #( FOR item IN items
+                      ( %tky = item-%tky
+                        %action-acceptDeviation =
+                          COND #( WHEN item-ItemStatus = lcl_const=>item_status-deviation
+                                  THEN if_abap_behv=>fc-o-enabled
+                                  ELSE if_abap_behv=>fc-o-disabled ) ) ).
+
+  ENDMETHOD.
+
+
+  METHOD acceptDeviation.
+
+    DATA updates TYPE TABLE FOR UPDATE zr_grreceipttp\\Item.
+
+    " No se corrige el peso recibido: se deja constancia de que alguien con
+    " criterio acepto la diferencia y por que motivo. Sobrescribir el dato
+    " borraria la evidencia de la reclamacion al proveedor.
+    LOOP AT keys INTO DATA(key).
+      APPEND VALUE #( %tky            = key-%tky
+                      ItemStatus      = lcl_const=>item_status-accepted
+                      DeviationReason = key-%param-ReasonId
+                      DeviationNote   = key-%param-Note )
+             TO updates.
+    ENDLOOP.
+
+    MODIFY ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        UPDATE FIELDS ( ItemStatus DeviationReason DeviationNote )
+        WITH updates
+      REPORTED DATA(update_reported).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    result = VALUE #( FOR item IN items
+                      ( %tky = item-%tky %param = item ) ).
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -565,6 +806,21 @@ CLASS lhc_Batch DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS validateSupplierBatch FOR VALIDATE ON SAVE
       IMPORTING keys FOR Batch~validateSupplierBatch.
+
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING REQUEST requested_authorizations FOR Batch RESULT result.
+
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested_authorizations FOR Batch RESULT result.
+
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING keys REQUEST requested_features FOR Batch RESULT result.
+
+    METHODS blockBatch FOR MODIFY
+      IMPORTING keys FOR ACTION Batch~blockBatch RESULT result.
+
+    METHODS releaseBatch FOR MODIFY
+      IMPORTING keys FOR ACTION Batch~releaseBatch RESULT result.
 
 ENDCLASS.
 
@@ -849,6 +1105,98 @@ CLASS lhc_Batch IMPLEMENTATION.
              TO reported-batch.
 
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD get_global_authorizations.
+
+    result-%update              = if_abap_behv=>auth-allowed.
+    result-%delete              = if_abap_behv=>auth-allowed.
+    result-%action-blockBatch   = if_abap_behv=>auth-allowed.
+    result-%action-releaseBatch = if_abap_behv=>auth-allowed.
+
+  ENDMETHOD.
+
+
+  METHOD get_instance_authorizations.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        FIELDS ( BatchUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(authorized_batches).
+
+    result = VALUE #( FOR batch IN authorized_batches
+                      ( %tky                    = batch-%tky
+                        %update                 = if_abap_behv=>auth-allowed
+                        %delete                 = if_abap_behv=>auth-allowed
+                        %action-blockBatch      = if_abap_behv=>auth-allowed
+                        %action-releaseBatch    = if_abap_behv=>auth-allowed ) ).
+
+  ENDMETHOD.
+
+
+  METHOD get_instance_features.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        FIELDS ( BatchStatus )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(batches).
+
+    " Bloquear y liberar son excluyentes: solo se ofrece la que aplica
+    result = VALUE #( FOR batch IN batches
+                      ( %tky = batch-%tky
+                        %action-blockBatch =
+                          COND #( WHEN batch-BatchStatus = lcl_const=>batch_status-blocked
+                                  THEN if_abap_behv=>fc-o-disabled
+                                  ELSE if_abap_behv=>fc-o-enabled )
+                        %action-releaseBatch =
+                          COND #( WHEN batch-BatchStatus = lcl_const=>batch_status-free
+                                  THEN if_abap_behv=>fc-o-disabled
+                                  ELSE if_abap_behv=>fc-o-enabled ) ) ).
+
+  ENDMETHOD.
+
+
+  METHOD blockBatch.
+
+    MODIFY ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        UPDATE FIELDS ( BatchStatus )
+        WITH VALUE #( FOR key IN keys
+                      ( %tky        = key-%tky
+                        BatchStatus = lcl_const=>batch_status-blocked ) )
+      REPORTED DATA(update_reported).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(batches).
+
+    result = VALUE #( FOR batch IN batches
+                      ( %tky = batch-%tky %param = batch ) ).
+
+  ENDMETHOD.
+
+
+  METHOD releaseBatch.
+
+    MODIFY ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        UPDATE FIELDS ( BatchStatus )
+        WITH VALUE #( FOR key IN keys
+                      ( %tky        = key-%tky
+                        BatchStatus = lcl_const=>batch_status-free ) )
+      REPORTED DATA(update_reported).
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(batches).
+
+    result = VALUE #( FOR batch IN batches
+                      ( %tky = batch-%tky %param = batch ) ).
 
   ENDMETHOD.
 

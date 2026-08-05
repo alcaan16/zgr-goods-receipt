@@ -1,4 +1,4 @@
-@EndUserText.label: 'Entrada de mercancia con lote y 2 unidad'
+@EndUserText.label: 'Entrada de mercancia lote y doble unidad'
 define service ZUI_GR_RECEIPT_O4 {
   expose ZC_GRReceiptTP       as Receipt;
   expose ZC_GRItemTP          as Item;
@@ -6,4 +6,5 @@ define service ZUI_GR_RECEIPT_O4 {
   expose ZI_GRMaterial        as Material;
   expose ZI_GRSupplier        as Supplier;
   expose ZI_GRDeviationReason as DeviationReason;
+  expose ZI_GRUnitOfMeasure   as UnitOfMeasure;
 }

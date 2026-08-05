@@ -22,8 +22,12 @@ annotate entity ZC_GRItemTP with
   @UI.hidden: true
   ReceiptUuid;
 
-  @UI: { lineItem:       [ { position: 10, label: 'Pos.' } ],
-         identification: [ { position: 10, label: 'Pos.' } ] }
+  @UI: { lineItem:       [ { position: 10, label: 'Pos.' },
+                           { type: #FOR_ACTION, dataAction: 'acceptDeviation',
+                             label: 'Aceptar desviacion' } ],
+         identification: [ { position: 10, label: 'Pos.' },
+                           { type: #FOR_ACTION, dataAction: 'acceptDeviation',
+                             label: 'Aceptar desviacion' } ] }
   ItemNumber;
 
   @UI: { lineItem:       [ { position: 20, label: 'Material' } ],

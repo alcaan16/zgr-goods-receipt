@@ -20,8 +20,12 @@ annotate entity ZC_GRReceiptTP with
   @UI.hidden: true
   ReceiptUuid;
 
-  @UI: { lineItem:       [ { position: 10, label: 'Nº entrada' } ],
-         identification: [ { position: 10, label: 'Nº entrada' } ],
+  @UI: { lineItem:       [ { position: 10, label: 'Nº entrada' },
+                           { type: #FOR_ACTION, dataAction: 'postReceipt',
+                             label: 'Registrar entrada' } ],
+         identification: [ { position: 10, label: 'Nº entrada' },
+                           { type: #FOR_ACTION, dataAction: 'postReceipt',
+                             label: 'Registrar entrada' } ],
          selectionField: [ { position: 10 } ] }
   ReceiptNumber;
 

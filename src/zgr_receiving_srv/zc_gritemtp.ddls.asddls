@@ -1,5 +1,5 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'Entrada de mercancia-Posicion-Proyec'
+@EndUserText.label: 'Entrada de mercancia-Posicion-Proyeccion'
 @Metadata.allowExtensions: true
 define view entity ZC_GRItemTP
   as projection on ZR_GRItemTP
@@ -19,7 +19,9 @@ define view entity ZC_GRItemTP
       QtyReceived,
       WeightReceived,
 
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZI_GRUnitOfMeasure', element: 'UomCode' } }]
       BaseUnit,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZI_GRUnitOfMeasure', element: 'UomCode' } }]
       WeightUnit,
 
       QtyDeviation,
