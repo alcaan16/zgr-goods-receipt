@@ -56,7 +56,8 @@ la posición. Si no cuadra, hay mercancía sin asignar a ningún lote.
 
 | Determination | Cuándo | Qué calcula |
 |---|---|---|
-| `setReceiptNumber` | on save, create | Número de entrada |
+| `setReceiptNumber` | on save, create | Número de entrada correlativo |
+| `setItemNumber` | on modify, create | Número de posición, de 10 en 10 |
 | `setInitialStatus` | on modify, create | Estado `1` Borrador |
 | `calculateInternalBatchCode` | on modify, create de lote | `AAAAMMDD` + secuencial del día |
 | `calculateExpiryDate` | on modify, create/update de fecha de producción | `ProductionDate + ShelfLifeDays` |
@@ -93,133 +94,35 @@ peso recibido borraría la evidencia de la reclamación.
 
 ---
 
-## Esqueleto de la behavior definition
+## Estructura del comportamiento
 
-Referencia para la implementación en M2–M4. Los nombres son los definitivos.
-
-```abap
+```
 managed implementation in class zbp_r_grreceipttp unique;
 strict ( 2 );
 with draft;
+```
 
-define behavior for ZR_GRReceiptTP alias Receipt
-persistent table zgr_receipt
-draft table zgr_receipt_d
-lock master
-total etag LastChangedAt
-authorization master ( instance )
-etag master LocalLastChangedAt
-{
-  field ( numbering : managed, readonly ) ReceiptUuid;
-  field ( readonly ) ReceiptNumber, OverallStatus, TotalQuantity, TotalWeight,
-                     CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChangedAt;
-  field ( mandatory ) SupplierId, DeliveryNote, ReceiptDate;
+Las tres entidades declaran `authorization master ( instance, global )`. La raíz es además
+`lock master`; posiciones y lotes son `lock dependent by _Receipt`, apuntando directamente a la
+raíz y no al padre inmediato, como exige RAP.
 
-  create;
-  update;
-  delete;
+Con `strict ( 2 )` y draft activado, **todas las validaciones deben declararse dentro de la acción
+`Prepare`** de la raíz, cualificadas con el alias de su entidad. Tiene sentido: `Prepare` es lo que
+decide si un borrador puede activarse, así que RAP exige que quede explícito qué se comprueba en ese
+momento.
 
-  association _Item { create; with draft; }
-
-  determination setInitialStatus     on modify { create; }
-  determination setReceiptNumber     on save   { create; }
-  determination calculateHeaderTotals on modify { field TotalQuantity, TotalWeight; }
-
-  validation validateSupplier on save { create; field SupplierId; }
-
-  action ( features : instance ) postReceipt result [1] $self;
-
-  draft action Activate optimized;
-  draft action Discard;
-  draft action Edit;
-  draft action Resume;
+```abap
   draft determine action Prepare
   {
     validation validateSupplier;
+    validation Item~validateMaterial;
+    validation Item~validateQuantities;
+    validation Item~validateWeightPlausibility;
+    validation Item~validateBatchQuantities;
+    validation Batch~validateExpiryDate;
+    validation Batch~validateSupplierBatch;
   }
-
-  mapping for zgr_receipt
-  {
-    ReceiptUuid        = receipt_uuid;
-    ReceiptNumber      = receipt_number;
-    SupplierId         = supplier_id;
-    DeliveryNote       = delivery_note;
-    ReceiptDate        = receipt_date;
-    PlantId            = plant_id;
-    OverallStatus      = overall_status;
-    TotalQuantity      = total_quantity;
-    TotalUnit          = total_unit;
-    TotalWeight        = total_weight;
-    WeightUnit         = weight_unit;
-    CreatedBy          = created_by;
-    CreatedAt          = created_at;
-    LastChangedBy      = last_changed_by;
-    LastChangedAt      = last_changed_at;
-    LocalLastChangedAt = local_last_changed_at;
-  }
-}
-
-define behavior for ZR_GRItemTP alias Item
-persistent table zgr_rec_item
-draft table zgr_rec_item_d
-lock dependent by _Receipt
-authorization dependent by _Receipt
-etag master LocalLastChangedAt
-{
-  field ( numbering : managed, readonly ) ItemUuid;
-  field ( readonly ) ReceiptUuid, QtyDeviation, WeightDeviation, DeviationPct, ItemStatus;
-  field ( mandatory ) MaterialId, QtyExpected, QtyReceived;
-
-  update;
-  delete;
-
-  association _Receipt { with draft; }
-  association _Batch   { create; with draft; }
-
-  determination calculateDeviation on modify { field QtyReceived, WeightReceived; }
-
-  validation validateMaterial            on save { create; field MaterialId; }
-  validation validateQuantities          on save { create; field QtyReceived, WeightReceived; }
-  validation validateWeightPlausibility  on save { create; field QtyReceived, WeightReceived; }
-  validation validateBatchQuantities     on save { create; update; }
-
-  action ( features : instance ) acceptDeviation
-    parameter ZD_GRAcceptDeviation result [1] $self;
-
-  mapping for zgr_rec_item corresponding;
-}
-
-define behavior for ZR_GRBatchTP alias Batch
-persistent table zgr_batch
-draft table zgr_batch_d
-lock dependent by _Item
-authorization dependent by _Item
-etag master LocalLastChangedAt
-{
-  field ( numbering : managed, readonly ) BatchUuid;
-  field ( readonly ) ItemUuid, BatchNumber, ExpiryDate, BatchStatus;
-  field ( mandatory ) SupplierBatch, ProductionDate;
-
-  update;
-  delete;
-
-  association _Item { with draft; }
-
-  determination calculateInternalBatchCode on modify { create; }
-  determination calculateExpiryDate        on modify { create; field ProductionDate; }
-
-  validation validateExpiryDate    on save { create; field ProductionDate; }
-  validation validateSupplierBatch on save { create; field SupplierBatch; }
-
-  action ( features : instance ) blockBatch   result [1] $self;
-  action ( features : instance ) releaseBatch result [1] $self;
-
-  mapping for zgr_batch corresponding;
-}
 ```
-
-> `ZD_GRAcceptDeviation` es una entidad abstracta CDS con los parámetros de la acción
-> (`ReasonId`, `Note`). Se crea en M4.
 
 ---
 

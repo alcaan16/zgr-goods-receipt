@@ -9,8 +9,8 @@ ZR_GRReceiptTP   Entrada de mercancía (raíz)
     └── ZR_GRBatchTP     Lote
 ```
 
-Fuera del árbol, tres vistas de reutilización sobre maestros simplificados:
-`ZI_GRSupplier`, `ZI_GRMaterial`, `ZI_GRDeviationReason`.
+Fuera del árbol, cuatro vistas de reutilización sobre maestros y catálogos simplificados:
+`ZI_GRSupplier`, `ZI_GRMaterial`, `ZI_GRDeviationReason` y `ZI_GRUnitOfMeasure`.
 
 ---
 
@@ -24,8 +24,8 @@ Fuera del árbol, tres vistas de reutilización sobre maestros simplificados:
 | `ReceiptDate` | Fecha de descarga; base para el cálculo de vida útil restante |
 | `PlantId` | Centro |
 | `OverallStatus` | `1` Borrador · `2` En revisión · `3` Registrada |
-| `TotalQuantity` / `TotalUnit` | Total en unidades |
-| `TotalWeight` / `WeightUnit` | Total en kilos |
+| `TotalQuantity` / `TotalUnit` | Total en unidades, calculado desde las posiciones |
+| `TotalWeight` / `WeightUnit` | Total en kilos, calculado desde las posiciones |
 | Campos administrativos | Los cinco de RAP. El ETag total vive en la raíz |
 
 > Las dos parejas de total no son redundancia. En producto fresco, unidades y kilos son dos
@@ -35,6 +35,7 @@ Fuera del árbol, tres vistas de reutilización sobre maestros simplificados:
 
 | Campo | Por qué está |
 |---|---|
+| `ItemNumber` | Número de posición, asignado por el sistema de 10 en 10 |
 | `MaterialId` | Material recibido |
 | `QtyExpected` / `WeightExpected` | Lo que dice el albarán |
 | `QtyReceived` / `WeightReceived` | Lo que dicen el conteo y la báscula |
@@ -49,6 +50,7 @@ Fuera del árbol, tres vistas de reutilización sobre maestros simplificados:
 
 | Campo | Por qué está |
 |---|---|
+| `ReceiptUuid` | Clave de la cabecera. RAP exige que `lock` y `authorization dependent` apunten a la raíz, no al padre inmediato |
 | `BatchNumber` | Lote interno de fábrica: `AAAAMMDD` + secuencial del día (ej. `202607310198`) |
 | `SupplierBatch` | Lote del proveedor. **El eslabón que une la cadena hacia atrás** |
 | `ProductionDate` | Fecha de producción declarada por el proveedor |
@@ -82,3 +84,19 @@ Identificación y estado. Un proveedor inactivo no puede recibir mercancía.
 ### `zgr_dev_reason` / `ZI_GRDeviationReason`
 Catálogo cerrado de motivos de desviación. Es la ayuda de búsqueda del parámetro de la acción de
 regularización: si el motivo fuera texto libre, no se podría explotar después.
+
+### `zgr_uom` / `ZI_GRUnitOfMeasure`
+Catálogo propio de unidades de medida, con distinción entre unidades de cantidad y de peso. Sustituye
+a la validación contra el maestro estándar de SAP, que este entorno no tiene. No permite conversión
+entre unidades, pero impide inventárselas.
+
+---
+
+## Nota sobre los tipos
+
+Las cantidades son `abap.dec(13,3)` y las unidades `abap.char(3)`, en lugar de `abap.quan` y
+`abap.unit`. El motivo está explicado en `decisiones-tecnicas.md`: el entorno no dispone de
+configuración de unidades de medida y la capa de conversión de OData rechaza cualquier valor al leer.
+
+El modelo de doble unidad no se ve afectado: siguen siendo dos magnitudes independientes con su
+unidad al lado.

@@ -153,17 +153,53 @@ se borra una posición.
 
 ---
 
+### `%path` en mensajes de entidades hijas
+
+Un mensaje sobre una posición o un lote necesita declarar de qué instancia padre cuelga. Sin `%path`,
+la validación bloquea el guardado pero Fiori no encuentra dónde pintar el mensaje y muestra solo un
+aviso genérico. Los mensajes de lote declaran los dos niveles: cabecera y posición.
+
+### Longitud de los mensajes
+
+`new_message_with_text` trunca el texto en torno a **50 caracteres**. Los mensajes se diseñan para
+caber sin perder los valores numéricos: `Peso medio 13.000 kg, max 1.900` transmite lo mismo que una
+frase explicativa y entra completo.
+
+Contrapartida asumida: los mensajes se construyen con plantillas de string y **no son traducibles**.
+Se eligió esta vía porque permite componer el texto con valores calculados sin el límite de cuatro
+marcadores de posición y sin crear un objeto adicional. En un proyecto real irían en una clase de
+mensajes T100.
+
+---
+
 ## Alcance
 
 ### Sin control de autorizaciones
 
-`@AccessControl.authorizationCheck: #NOT_REQUIRED` en todas las vistas, y
-`get_instance_authorizations` vacío. Añadir DCL y roles no demuestra nada que este proyecto quiera
-demostrar y sí añade superficie de error. Decisión consciente, escrita aquí para que se lea como
-tal.
+`@AccessControl.authorizationCheck: #NOT_REQUIRED` en todas las vistas.
 
-Consecuencia visible: el activador emite un aviso permanente
-`Operation "create" should be equipped with (global) authorization`.
+Los manejadores de autorización global e instancia **existen y conceden todos los permisos de forma
+explícita**, en las tres entidades. RAP no admite manejadores vacíos cuando hay acciones vinculadas
+a instancia: exige una respuesta, no el silencio. La decisión de alcance es no modelar roles, no
+omitir la capa.
+
+Las entidades hijas declaran `authorization master ( instance, global )` propia, aunque sean
+`lock dependent by _Receipt`. Bloqueo y autorización son independientes en RAP, y las acciones
+vinculadas a instancia sobre una entidad hija se comprueban en esa entidad.
+
+### Textos de estado
+
+Los estados se muestran como código numérico. Se intentó resolver con un catálogo de textos y
+`@UI.textArrangement: #TEXT_ONLY`, siguiendo el mismo patrón que ya funciona con el nombre del
+proveedor y la descripción del material.
+
+El obstáculo está en la exposición: una entidad de textos publicada en el servicio OData V4 junto a
+la entidad transaccional que la referencia impide que Fiori Elements cargue el componente de UI. El
+error que lo destapa es `Key fields of entities ZI_GRSTATUS and ZC_GRRECEIPTTP do not match`. Se
+probó con clave compuesta, con clave calculada y con clave simple de dos caracteres, y las tres
+fallan por el mismo motivo de fondo.
+
+Queda como limitación conocida con el diagnóstico acotado.
 
 ### Nomenclatura
 
@@ -174,6 +210,26 @@ comportamiento.
 
 Los nombres de método están limitados a 30 caracteres, lo que condiciona la longitud de los nombres
 de los tests.
+
+---
+
+### Cláusulas `WHERE` en operaciones masivas
+
+Los `DELETE` y `SELECT` sobre tablas propias llevan condición explícita aunque afecten a todas las
+filas. No cambia el resultado; hace explícita la intención y satisface el control del ATC sobre
+operaciones sin restringir.
+
+### Acceso por clave secundaria
+
+Los `READ TABLE` y `LOOP AT` sobre tablas de resultado y de enlace de RAP usan la clave secundaria
+`id` con `WITH TABLE KEY id COMPONENTS` y `USING KEY id`. En tablas de tres filas no cambia nada
+medible; en un documento con doscientas posiciones, sí.
+
+### Literales de datos de demostración
+
+Los nombres de proveedores, materiales y motivos que genera `ZCL_GR_DATA_GENERATOR` aparecen como
+hallazgos informativos de texto no traducible en el ATC. Son contenido de una base de datos de
+ejemplo, no textos de interfaz, y no procede convertirlos en elementos de texto.
 
 ---
 
@@ -191,3 +247,11 @@ de los tests.
   se teclea libremente y no se valida contra ningún catálogo.
 - **Sin formateo de cantidad con unidad.** Las cantidades se muestran en una columna y su unidad en
   otra, en lugar de renderizarse juntas.
+- **Los estados se muestran como código numérico** en lugar de texto. Diagnóstico acotado arriba.
+- **Los mensajes de validación no son traducibles** y se truncan en torno a 50 caracteres.
+- **La validación de lote de proveedor no es alcanzable desde la interfaz**, porque el campo está
+  marcado como obligatorio en las anotaciones de UI y Fiori lo bloquea antes del guardado. La regla
+  existe en el servidor y protege el acceso vía API.
+- **Tres hallazgos informativos del ATC sobre `DELETE` en tablas de draft** persisten: la condición
+  no aprovecha un índice de HANA. Se trata de un generador de datos de demostración, no de código de
+  negocio.
