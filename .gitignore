@@ -1,0 +1,12 @@
+# Nunca subir claves de servicio del ABAP Environment ni ficheros de conexion
+*service-key*.json
+*servicekey*.json
+*.key
+*.pem
+.env
+
+# Ruido local
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
