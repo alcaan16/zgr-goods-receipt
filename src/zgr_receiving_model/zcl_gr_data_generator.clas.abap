@@ -11,8 +11,6 @@ CLASS zcl_gr_data_generator DEFINITION
     METHODS fill_master_data.
     METHODS fill_demo_receipts.
 
-    " xco_cp=>uuid( )->value es la via liberada para ABAP Cloud.
-    " Alternativa clasica: cl_system_uuid=>create_uuid_x16_static( ).
     METHODS new_uuid
       RETURNING VALUE(result) TYPE sysuuid_x16.
 ENDCLASS.
@@ -26,17 +24,19 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
     fill_master_data( ).
     fill_demo_receipts( ).
 
-    SELECT COUNT(*) FROM zgr_supplier   INTO @DATA(suppliers).
-    SELECT COUNT(*) FROM zgr_material   INTO @DATA(materials).
-    SELECT COUNT(*) FROM zgr_dev_reason INTO @DATA(reasons).
-    SELECT COUNT(*) FROM zgr_receipt    INTO @DATA(receipts).
-    SELECT COUNT(*) FROM zgr_rec_item   INTO @DATA(items).
-    SELECT COUNT(*) FROM zgr_batch      INTO @DATA(batches).
+    SELECT COUNT( * ) FROM zgr_supplier   WHERE supplier_id IS NOT INITIAL INTO @DATA(suppliers).
+    SELECT COUNT( * ) FROM zgr_material   WHERE material_id IS NOT INITIAL INTO @DATA(materials).
+    SELECT COUNT( * ) FROM zgr_dev_reason WHERE reason_id   IS NOT INITIAL INTO @DATA(reasons).
+    SELECT COUNT( * ) FROM zgr_uom        WHERE uom_code    IS NOT INITIAL INTO @DATA(uom_count).
+    SELECT COUNT( * ) FROM zgr_receipt    WHERE receipt_uuid IS NOT INITIAL INTO @DATA(receipts).
+    SELECT COUNT( * ) FROM zgr_rec_item   WHERE item_uuid   IS NOT INITIAL INTO @DATA(items).
+    SELECT COUNT( * ) FROM zgr_batch      WHERE batch_uuid  IS NOT INITIAL INTO @DATA(batches).
 
     out->write( |Datos de demo generados:| ).
     out->write( |  Proveedores .......... { suppliers }| ).
     out->write( |  Materiales ........... { materials }| ).
     out->write( |  Motivos de desviacion  { reasons }| ).
+    out->write( |  Unidades de medida ... { uom_count }| ).
     out->write( |  Entradas ............. { receipts }| ).
     out->write( |  Posiciones ........... { items }| ).
     out->write( |  Lotes ................ { batches }| ).
@@ -45,34 +45,35 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
 
   METHOD clear_all.
-    DELETE FROM zgr_uom.
-    DELETE FROM zgr_batch_d.
-    DELETE FROM zgr_rec_item_d.
-    DELETE FROM zgr_receipt_d.
-    DELETE FROM zgr_batch.
-    DELETE FROM zgr_rec_item.
-    DELETE FROM zgr_receipt.
-    DELETE FROM zgr_material.
-    DELETE FROM zgr_supplier.
-    DELETE FROM zgr_dev_reason.
+
+    " Las clausulas WHERE no son decorativas: el ATC marca como error un
+    " DELETE sin condicion sobre una tabla que puede crecer. Un UUID nunca
+    " es inicial, asi que el efecto es el mismo y la intencion queda explicita.
+DATA(no_uuid) = VALUE sysuuid_x16( ).
+
+    DELETE FROM zgr_batch_d    WHERE batchuuid   > @no_uuid.
+    DELETE FROM zgr_rec_item_d WHERE itemuuid    > @no_uuid.
+    DELETE FROM zgr_receipt_d  WHERE receiptuuid > @no_uuid.
+
+    DELETE FROM zgr_batch      WHERE batch_uuid   IS NOT INITIAL.
+    DELETE FROM zgr_rec_item   WHERE item_uuid    IS NOT INITIAL.
+    DELETE FROM zgr_receipt    WHERE receipt_uuid IS NOT INITIAL.
+
+    DELETE FROM zgr_material   WHERE material_id  IS NOT INITIAL.
+    DELETE FROM zgr_supplier   WHERE supplier_id  IS NOT INITIAL.
+    DELETE FROM zgr_dev_reason WHERE reason_id    IS NOT INITIAL.
+    DELETE FROM zgr_uom        WHERE uom_code     IS NOT INITIAL.
+
     COMMIT WORK.
+
   ENDMETHOD.
 
 
   METHOD fill_master_data.
 
-    DATA uoms TYPE STANDARD TABLE OF zgr_uom WITH EMPTY KEY.
-    uoms = VALUE #(
-      ( uom_code = 'ST' description = 'Unidades / piezas'  uom_type = 'C' is_active = abap_true )
-      ( uom_code = 'CAJ' description = 'Cajas'             uom_type = 'C' is_active = abap_true )
-      ( uom_code = 'PAL' description = 'Palets'            uom_type = 'C' is_active = abap_true )
-      ( uom_code = 'KG' description = 'Kilogramos'         uom_type = 'P' is_active = abap_true )
-      ( uom_code = 'G'  description = 'Gramos'             uom_type = 'P' is_active = abap_true ) ).
-
-
     DATA suppliers TYPE STANDARD TABLE OF zgr_supplier WITH EMPTY KEY.
     suppliers = VALUE #(
-      ( supplier_id = 'PROV001' supplier_name = 'Avicola del Sur, S.L.'      country = 'ES' is_active = abap_true )
+      ( supplier_id = 'PROV001' supplier_name = 'Avicola del Sur, S.L.'       country = 'ES' is_active = abap_true )
       ( supplier_id = 'PROV002' supplier_name = 'Carnicas Guadalquivir, S.A.' country = 'ES' is_active = abap_true )
       ( supplier_id = 'PROV003' supplier_name = 'Pavos de Castilla, S.L.'     country = 'ES' is_active = abap_true )
       ( supplier_id = 'PROV004' supplier_name = 'Distribuciones Baja Ribera'  country = 'ES' is_active = abap_false ) ).
@@ -103,16 +104,24 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
     DATA reasons TYPE STANDARD TABLE OF zgr_dev_reason WITH EMPTY KEY.
     reasons = VALUE #(
-      ( reason_id = 'R001' description = 'Rotura o merma en transporte'      is_active = abap_true )
-      ( reason_id = 'R002' description = 'Diferencia de peso en bascula'      is_active = abap_true )
-      ( reason_id = 'R003' description = 'Temperatura fuera de rango'         is_active = abap_true )
-      ( reason_id = 'R004' description = 'Diferencia de conteo de unidades'   is_active = abap_true )
-      ( reason_id = 'R005' description = 'Documento de entrada incorrecto'    is_active = abap_true ) ).
+      ( reason_id = 'R001' description = 'Rotura o merma en transporte'    is_active = abap_true )
+      ( reason_id = 'R002' description = 'Diferencia de peso en bascula'   is_active = abap_true )
+      ( reason_id = 'R003' description = 'Temperatura fuera de rango'      is_active = abap_true )
+      ( reason_id = 'R004' description = 'Diferencia de conteo de unidades' is_active = abap_true )
+      ( reason_id = 'R005' description = 'Documento de entrada incorrecto' is_active = abap_true ) ).
 
-    INSERT zgr_uom        FROM TABLE @uoms.
+    DATA uoms TYPE STANDARD TABLE OF zgr_uom WITH EMPTY KEY.
+    uoms = VALUE #(
+      ( uom_code = 'ST'  description = 'Unidades / piezas' uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'CAJ' description = 'Cajas'             uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'PAL' description = 'Palets'            uom_type = 'C' is_active = abap_true )
+      ( uom_code = 'KG'  description = 'Kilogramos'        uom_type = 'P' is_active = abap_true )
+      ( uom_code = 'G'   description = 'Gramos'            uom_type = 'P' is_active = abap_true ) ).
+
     INSERT zgr_supplier   FROM TABLE @suppliers.
     INSERT zgr_material   FROM TABLE @materials.
     INSERT zgr_dev_reason FROM TABLE @reasons.
+    INSERT zgr_uom        FROM TABLE @uoms.
     COMMIT WORK.
 
   ENDMETHOD.
@@ -122,12 +131,10 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
     DATA(today) = cl_abap_context_info=>get_system_date( ).
 
-    " ---------- Entrada 1: conforme ----------
     DATA(receipt1_uuid) = new_uuid( ).
     DATA(item11_uuid)   = new_uuid( ).
     DATA(item12_uuid)   = new_uuid( ).
 
-    " ---------- Entrada 2: con desviacion de peso ----------
     DATA(receipt2_uuid) = new_uuid( ).
     DATA(item21_uuid)   = new_uuid( ).
 
@@ -185,7 +192,7 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
     DATA batches TYPE STANDARD TABLE OF zgr_batch WITH EMPTY KEY.
     batches = VALUE #(
-      ( batch_uuid   = new_uuid( )  item_uuid = item11_uuid
+      ( batch_uuid   = new_uuid( )  item_uuid = item11_uuid  receipt_uuid = receipt1_uuid
         batch_number = |{ day_prefix }0001|
         supplier_batch  = 'L-AVS-260803-A'
         production_date = today - 1  expiry_date = today + 7
@@ -193,7 +200,7 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
         qty_weight = '748.200' weight_unit = 'KG'
         batch_status = '1' )
 
-      ( batch_uuid   = new_uuid( )  item_uuid = item12_uuid
+      ( batch_uuid   = new_uuid( )  item_uuid = item12_uuid  receipt_uuid = receipt1_uuid
         batch_number = |{ day_prefix }0002|
         supplier_batch  = 'L-PVC-260802-K'
         production_date = today - 2  expiry_date = today + 8
@@ -201,7 +208,7 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
         qty_weight = '1137.200' weight_unit = 'KG'
         batch_status = '1' )
 
-      ( batch_uuid   = new_uuid( )  item_uuid = item21_uuid
+      ( batch_uuid   = new_uuid( )  item_uuid = item21_uuid  receipt_uuid = receipt2_uuid
         batch_number = |{ day_prefix }0003|
         supplier_batch  = 'L-CGQ-260801-3'
         production_date = today - 3  expiry_date = today + 9
@@ -222,4 +229,5 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

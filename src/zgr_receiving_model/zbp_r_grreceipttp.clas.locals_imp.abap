@@ -135,7 +135,9 @@ CLASS lhc_Receipt IMPLEMENTATION.
     " Numeracion correlativa sobre el maximo persistido.
     " Limitacion conocida: sin objeto de rango de numeros, dos usuarios
     " creando a la vez podrian obtener el mismo numero.
-    SELECT MAX( receipt_number ) FROM zgr_receipt INTO @DATA(highest).
+    SELECT MAX( receipt_number ) FROM zgr_receipt
+      WHERE receipt_number IS NOT INITIAL
+      INTO @DATA(highest).
     DATA(next_number) = CONV i( highest ).
 
     DATA updates TYPE TABLE FOR UPDATE zr_grreceipttp.
@@ -231,8 +233,8 @@ CLASS lhc_Receipt IMPLEMENTATION.
       " Y no se registra mientras haya discrepancias sin resolver:
       " esa decision la toma una persona, no el sistema
       IF can_post = abap_true.
-        LOOP AT item_links INTO DATA(link) WHERE source-%tky = receipt-%tky.
-          READ TABLE items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+        LOOP AT item_links INTO DATA(link) USING KEY id WHERE source-%tky = receipt-%tky.
+          READ TABLE items INTO DATA(item) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
           CHECK sy-subrc = 0.
           IF item-ItemStatus = lcl_const=>item_status-deviation.
             can_post = abap_false.
@@ -446,9 +448,9 @@ CLASS lhc_Item IMPLEMENTATION.
       DATA(base_unit)      = VALUE zgr_receipt-total_unit( ).
       DATA(weight_unit)    = VALUE zgr_receipt-weight_unit( ).
 
-      LOOP AT item_links INTO DATA(link) WHERE source-%tky = receipt-%tky.
+      LOOP AT item_links INTO DATA(link) USING KEY id WHERE source-%tky = receipt-%tky.
 
-        READ TABLE all_items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+        READ TABLE all_items INTO DATA(item) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
         CHECK sy-subrc = 0.
 
         total_quantity = total_quantity + item-QtyReceived.
@@ -683,8 +685,8 @@ CLASS lhc_Item IMPLEMENTATION.
       DATA(total_weight) = VALUE zgr_batch-qty_weight( ).
       DATA(has_batches)  = abap_false.
 
-      LOOP AT batch_links INTO DATA(link) WHERE source-%tky = item-%tky.
-        READ TABLE batches INTO DATA(batch) WITH KEY %tky = link-target-%tky.
+      LOOP AT batch_links INTO DATA(link) USING KEY id WHERE source-%tky = item-%tky.
+        READ TABLE batches INTO DATA(batch) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
         CHECK sy-subrc = 0.
         has_batches  = abap_true.
         total_units  = total_units  + batch-QtyUnits.
@@ -851,9 +853,9 @@ CLASS lhc_Batch IMPLEMENTATION.
 
     LOOP AT batches INTO DATA(batch).
 
-      READ TABLE receipt_links INTO DATA(link) WITH KEY source-%tky = batch-%tky.
+      READ TABLE receipt_links INTO DATA(link) WITH TABLE KEY id COMPONENTS source-%tky = batch-%tky.
       CHECK sy-subrc = 0.
-      READ TABLE receipts INTO DATA(receipt) WITH KEY %tky = link-target-%tky.
+      READ TABLE receipts INTO DATA(receipt) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
       CHECK sy-subrc = 0.
 
       DATA(reference_date) = COND d( WHEN receipt-ReceiptDate IS INITIAL
@@ -921,9 +923,9 @@ CLASS lhc_Batch IMPLEMENTATION.
 
     LOOP AT batches INTO DATA(batch).
 
-      READ TABLE item_links INTO DATA(link) WITH KEY source-%tky = batch-%tky.
+      READ TABLE item_links INTO DATA(link) WITH TABLE KEY id COMPONENTS source-%tky = batch-%tky.
       CHECK sy-subrc = 0.
-      READ TABLE items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+      READ TABLE items INTO DATA(item) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
       CHECK sy-subrc = 0.
       READ TABLE materials INTO DATA(material) WITH KEY material_id = item-MaterialId.
       CHECK sy-subrc = 0 AND material-shelf_life_days > 0.
@@ -989,16 +991,16 @@ CLASS lhc_Batch IMPLEMENTATION.
                                                                %is_draft        = batch-%is_draft ) )
                       %state_area = 'VALIDATE_EXPIRY' ) TO reported-batch.
 
-      READ TABLE item_links INTO DATA(item_link) WITH KEY source-%tky = batch-%tky.
+      READ TABLE item_links INTO DATA(item_link) WITH TABLE KEY id COMPONENTS source-%tky = batch-%tky.
       CHECK sy-subrc = 0.
-      READ TABLE items INTO DATA(item) WITH KEY %tky = item_link-target-%tky.
+      READ TABLE items INTO DATA(item) WITH TABLE KEY id COMPONENTS %tky = item_link-target-%tky.
       CHECK sy-subrc = 0.
       READ TABLE materials INTO DATA(material) WITH KEY material_id = item-MaterialId.
       CHECK sy-subrc = 0.
 
-      READ TABLE receipt_links INTO DATA(receipt_link) WITH KEY source-%tky = batch-%tky.
+      READ TABLE receipt_links INTO DATA(receipt_link) WITH TABLE KEY id COMPONENTS source-%tky = batch-%tky.
       CHECK sy-subrc = 0.
-      READ TABLE receipts INTO DATA(receipt) WITH KEY %tky = receipt_link-target-%tky.
+      READ TABLE receipts INTO DATA(receipt) WITH TABLE KEY id COMPONENTS %tky = receipt_link-target-%tky.
       CHECK sy-subrc = 0.
 
       DATA(evaluation) = zcl_gr_shelf_life=>evaluate(
@@ -1082,9 +1084,9 @@ CLASS lhc_Batch IMPLEMENTATION.
 
       CHECK batch-SupplierBatch IS INITIAL.
 
-      READ TABLE item_links INTO DATA(link) WITH KEY source-%tky = batch-%tky.
+      READ TABLE item_links INTO DATA(link) WITH TABLE KEY id COMPONENTS source-%tky = batch-%tky.
       CHECK sy-subrc = 0.
-      READ TABLE items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+      READ TABLE items INTO DATA(item) WITH TABLE KEY id COMPONENTS %tky = link-target-%tky.
       CHECK sy-subrc = 0.
       READ TABLE materials INTO DATA(material) WITH KEY material_id = item-MaterialId.
       CHECK sy-subrc = 0 AND material-batch_managed = abap_true.
@@ -1201,4 +1203,5 @@ CLASS lhc_Batch IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
