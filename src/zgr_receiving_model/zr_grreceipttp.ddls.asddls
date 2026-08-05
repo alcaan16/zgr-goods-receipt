@@ -18,11 +18,8 @@ define root view entity ZR_GRReceiptTP
       plant_id              as PlantId,
       overall_status        as OverallStatus,
 
-      @Semantics.quantity.unitOfMeasure: 'TotalUnit'
       total_quantity        as TotalQuantity,
       total_unit            as TotalUnit,
-
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       total_weight          as TotalWeight,
       weight_unit           as WeightUnit,
 

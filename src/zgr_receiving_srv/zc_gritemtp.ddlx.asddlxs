@@ -43,9 +43,17 @@ annotate entity ZC_GRItemTP with
          identification: [ { position: 50, label: 'Unidades recibidas' } ] }
   QtyReceived;
 
+  @UI: { lineItem:       [ { position: 55, label: 'Un.' } ],
+         identification: [ { position: 55, label: 'Unidad base' } ] }
+  BaseUnit;
+
   @UI: { lineItem:       [ { position: 60, label: 'Peso recibido' } ],
          identification: [ { position: 60, label: 'Peso recibido' } ] }
   WeightReceived;
+
+  @UI: { lineItem:       [ { position: 65, label: 'Un.' } ],
+         identification: [ { position: 65, label: 'Unidad de peso' } ] }
+  WeightUnit;
 
   @UI: { lineItem:       [ { position: 70, label: 'Desviacion peso' } ],
          identification: [ { position: 70, label: 'Desviacion peso' } ] }
@@ -67,10 +75,6 @@ annotate entity ZC_GRItemTP with
 
   @UI.hidden: true
   QtyDeviation;
-  @UI.hidden: true
-  BaseUnit;
-  @UI.hidden: true
-  WeightUnit;
   @UI.hidden: true
   LocalLastChangedAt;
 }

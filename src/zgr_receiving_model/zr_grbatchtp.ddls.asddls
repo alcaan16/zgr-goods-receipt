@@ -25,11 +25,8 @@ define view entity ZR_GRBatchTP
       production_date       as ProductionDate,
       expiry_date           as ExpiryDate,
 
-      @Semantics.quantity.unitOfMeasure: 'BaseUnit'
       qty_units             as QtyUnits,
       base_unit             as BaseUnit,
-
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       qty_weight            as QtyWeight,
       weight_unit           as WeightUnit,
 

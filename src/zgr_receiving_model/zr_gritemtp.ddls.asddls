@@ -21,22 +21,15 @@ define view entity ZR_GRItemTP
       item_number           as ItemNumber,
       material_id           as MaterialId,
 
-      @Semantics.quantity.unitOfMeasure: 'BaseUnit'
       qty_expected          as QtyExpected,
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       weight_expected       as WeightExpected,
-
-      @Semantics.quantity.unitOfMeasure: 'BaseUnit'
       qty_received          as QtyReceived,
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       weight_received       as WeightReceived,
 
       base_unit             as BaseUnit,
       weight_unit           as WeightUnit,
 
-      @Semantics.quantity.unitOfMeasure: 'BaseUnit'
       qty_deviation         as QtyDeviation,
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       weight_deviation      as WeightDeviation,
       deviation_pct         as DeviationPct,
 

@@ -42,18 +42,22 @@ annotate entity ZC_GRBatchTP with
          identification: [ { position: 50, label: 'Unidades' } ] }
   QtyUnits;
 
+  @UI: { lineItem:       [ { position: 55, label: 'Un.' } ],
+         identification: [ { position: 55, label: 'Unidad base' } ] }
+  BaseUnit;
+
   @UI: { lineItem:       [ { position: 60, label: 'Peso' } ],
          identification: [ { position: 60, label: 'Peso' } ] }
   QtyWeight;
+
+  @UI: { lineItem:       [ { position: 65, label: 'Un.' } ],
+         identification: [ { position: 65, label: 'Unidad de peso' } ] }
+  WeightUnit;
 
   @UI: { lineItem:       [ { position: 70, label: 'Estado' } ],
          identification: [ { position: 70, label: 'Estado' } ] }
   BatchStatus;
 
-  @UI.hidden: true
-  BaseUnit;
-  @UI.hidden: true
-  WeightUnit;
   @UI.hidden: true
   LocalLastChangedAt;
 }

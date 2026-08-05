@@ -1,5 +1,4 @@
 managed implementation in class zbp_r_grreceipttp unique;
-//managed;
 strict ( 2 );
 with draft;
 
@@ -21,6 +20,9 @@ etag master LocalLastChangedAt
   delete;
 
   association _Item { create; with draft; }
+
+  determination setInitialStatus on modify { create; }
+  determination setReceiptNumber on save { create; }
 
   draft action Activate optimized;
   draft action Discard;
@@ -67,6 +69,10 @@ etag master LocalLastChangedAt
   association _Receipt { with draft; }
   association _Batch { create; with draft; }
 
+  determination calculateDeviation on modify
+    { create; field QtyExpected, WeightExpected, QtyReceived, WeightReceived; }
+  determination calculateHeaderTotals on save { create; update; }
+
   mapping for zgr_rec_item
   {
     ItemUuid           = item_uuid;
@@ -106,6 +112,9 @@ etag master LocalLastChangedAt
 
   association _Item { with draft; }
   association _Receipt { with draft; }
+
+  determination calculateBatchCode on modify { create; }
+  determination calculateExpiryDate on modify { create; field ProductionDate; }
 
   mapping for zgr_batch
   {

@@ -53,14 +53,18 @@ annotate entity ZC_GRReceiptTP with
          identification: [ { position: 70, label: 'Total unidades' } ] }
   TotalQuantity;
 
+  @UI: { lineItem:       [ { position: 75, label: 'Un.' } ],
+         identification: [ { position: 75, label: 'Unidad base' } ] }
+  TotalUnit;
+
   @UI: { lineItem:       [ { position: 80, label: 'Total peso' } ],
          identification: [ { position: 80, label: 'Total peso' } ] }
   TotalWeight;
 
-  @UI.hidden: true
-  TotalUnit;
-  @UI.hidden: true
+  @UI: { lineItem:       [ { position: 85, label: 'Un.' } ],
+         identification: [ { position: 85, label: 'Unidad de peso' } ] }
   WeightUnit;
+
   @UI.hidden: true
   CreatedBy;
   @UI.hidden: true

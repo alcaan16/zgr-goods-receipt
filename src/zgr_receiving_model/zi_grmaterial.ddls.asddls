@@ -11,11 +11,9 @@ define view entity ZI_GRMaterial
       @Search.defaultSearchElement: true
       @Search.fuzzinessThreshold: 0.8
       material_name       as MaterialName,
-      
+
       base_unit           as BaseUnit,
-
       weight_unit         as WeightUnit,
-
 
       // Material gestionado en dos unidades de medida a la vez.
       // Es el escenario que SAP cubre con Catch Weight Management.
@@ -30,9 +28,6 @@ define view entity ZI_GRMaterial
       min_shelf_life_pct  as MinShelfLifePct,
 
       // Rango admisible de peso por pieza. Fuera de rango = error de bascula o de conteo.
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       weight_per_unit_min as WeightPerUnitMin,
-
-      @Semantics.quantity.unitOfMeasure: 'WeightUnit'
       weight_per_unit_max as WeightPerUnitMax
 }
