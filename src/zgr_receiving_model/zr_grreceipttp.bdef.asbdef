@@ -24,11 +24,22 @@ etag master LocalLastChangedAt
   determination setInitialStatus on modify { create; }
   determination setReceiptNumber on save { create; }
 
+  validation validateSupplier on save { create; field SupplierId; }
+
   draft action Activate optimized;
   draft action Discard;
   draft action Edit;
   draft action Resume;
-  draft determine action Prepare;
+  draft determine action Prepare
+  {
+    validation validateSupplier;
+    validation Item~validateMaterial;
+    validation Item~validateQuantities;
+    validation Item~validateWeightPlausibility;
+    validation Item~validateBatchQuantities;
+    validation Batch~validateExpiryDate;
+    validation Batch~validateSupplierBatch;
+  }
 
   mapping for zgr_receipt
   {
@@ -73,6 +84,13 @@ etag master LocalLastChangedAt
     { create; field QtyExpected, WeightExpected, QtyReceived, WeightReceived; }
   determination calculateHeaderTotals on save { create; update; }
 
+  validation validateMaterial on save { create; field MaterialId; }
+  validation validateQuantities on save
+    { create; field MaterialId, QtyReceived, WeightReceived; }
+  validation validateWeightPlausibility on save
+    { create; field MaterialId, QtyReceived, WeightReceived; }
+  validation validateBatchQuantities on save { create; update; }
+
   mapping for zgr_rec_item
   {
     ItemUuid           = item_uuid;
@@ -115,6 +133,9 @@ etag master LocalLastChangedAt
 
   determination calculateBatchCode on modify { create; }
   determination calculateExpiryDate on modify { create; field ProductionDate; }
+
+  validation validateExpiryDate on save { create; field ProductionDate; }
+  validation validateSupplierBatch on save { create; field SupplierBatch; }
 
   mapping for zgr_batch
   {

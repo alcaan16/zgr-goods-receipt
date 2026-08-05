@@ -47,6 +47,9 @@ CLASS lhc_Receipt DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS setReceiptNumber FOR DETERMINE ON SAVE
       IMPORTING keys FOR Receipt~setReceiptNumber.
 
+    METHODS validateSupplier FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Receipt~validateSupplier.
+
 ENDCLASS.
 
 
@@ -116,6 +119,59 @@ CLASS lhc_Receipt IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD validateSupplier.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Receipt
+        FIELDS ( SupplierId )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(receipts).
+
+    CHECK receipts IS NOT INITIAL.
+
+    SELECT supplier_id, supplier_name, is_active
+      FROM zgr_supplier
+      FOR ALL ENTRIES IN @receipts
+      WHERE supplier_id = @receipts-SupplierId
+      INTO TABLE @DATA(suppliers).
+
+    LOOP AT receipts INTO DATA(receipt).
+
+      " Limpia mensajes previos de esta validacion antes de volver a evaluarla
+      APPEND VALUE #( %tky        = receipt-%tky
+                      %state_area = 'VALIDATE_SUPPLIER' )
+             TO reported-receipt.
+
+      READ TABLE suppliers INTO DATA(supplier)
+           WITH KEY supplier_id = receipt-SupplierId.
+
+      IF sy-subrc <> 0.
+        APPEND VALUE #( %tky = receipt-%tky ) TO failed-receipt.
+        APPEND VALUE #( %tky                = receipt-%tky
+                        %state_area         = 'VALIDATE_SUPPLIER'
+                        %element-SupplierId = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Proveedor { receipt-SupplierId } no existe| ) )
+               TO reported-receipt.
+        CONTINUE.
+      ENDIF.
+
+      IF supplier-is_active = abap_false.
+        APPEND VALUE #( %tky = receipt-%tky ) TO failed-receipt.
+        APPEND VALUE #( %tky                = receipt-%tky
+                        %state_area         = 'VALIDATE_SUPPLIER'
+                        %element-SupplierId = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Proveedor { receipt-SupplierId } dado de baja| ) )
+               TO reported-receipt.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -128,6 +184,18 @@ CLASS lhc_Item DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS calculateHeaderTotals FOR DETERMINE ON SAVE
       IMPORTING keys FOR Item~calculateHeaderTotals.
+
+    METHODS validateMaterial FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Item~validateMaterial.
+
+    METHODS validateQuantities FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Item~validateQuantities.
+
+    METHODS validateWeightPlausibility FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Item~validateWeightPlausibility.
+
+    METHODS validateBatchQuantities FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Item~validateBatchQuantities.
 
 ENDCLASS.
 
@@ -250,6 +318,235 @@ CLASS lhc_Item IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD validateMaterial.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( MaterialId ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    CHECK items IS NOT INITIAL.
+
+    SELECT material_id FROM zgr_material
+      FOR ALL ENTRIES IN @items
+      WHERE material_id = @items-MaterialId
+      INTO TABLE @DATA(materials).
+
+    LOOP AT items INTO DATA(item).
+
+      APPEND VALUE #( %tky       = item-%tky
+                      %path      = VALUE #( receipt-%tky = VALUE #(
+                                     %key-ReceiptUuid = item-ReceiptUuid
+                                     %is_draft        = item-%is_draft ) )
+                      %state_area = 'VALIDATE_MATERIAL' ) TO reported-item.
+
+      IF NOT line_exists( materials[ material_id = item-MaterialId ] ).
+        APPEND VALUE #( %tky = item-%tky ) TO failed-item.
+        APPEND VALUE #( %tky                = item-%tky
+                        %path               = VALUE #( receipt-%tky = VALUE #(
+                                                %key-ReceiptUuid = item-ReceiptUuid
+                                                %is_draft        = item-%is_draft ) )
+                        %state_area         = 'VALIDATE_MATERIAL'
+                        %element-MaterialId = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Material { item-MaterialId } no existe| ) )
+               TO reported-item.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD validateQuantities.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( MaterialId QtyReceived WeightReceived ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    CHECK items IS NOT INITIAL.
+
+    SELECT material_id, material_name, catch_weight
+      FROM zgr_material
+      FOR ALL ENTRIES IN @items
+      WHERE material_id = @items-MaterialId
+      INTO TABLE @DATA(materials).
+
+    LOOP AT items INTO DATA(item).
+
+      APPEND VALUE #( %tky       = item-%tky
+                      %path      = VALUE #( receipt-%tky = VALUE #(
+                                     %key-ReceiptUuid = item-ReceiptUuid
+                                     %is_draft        = item-%is_draft ) )
+                      %state_area = 'VALIDATE_QUANTITIES' ) TO reported-item.
+
+      IF item-QtyReceived <= 0.
+        APPEND VALUE #( %tky = item-%tky ) TO failed-item.
+        APPEND VALUE #( %tky                 = item-%tky
+                        %path                = VALUE #( receipt-%tky = VALUE #(
+                                                 %key-ReceiptUuid = item-ReceiptUuid
+                                                 %is_draft        = item-%is_draft ) )
+                        %state_area          = 'VALIDATE_QUANTITIES'
+                        %element-QtyReceived = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |La cantidad recibida debe ser mayor que 0| ) )
+               TO reported-item.
+      ENDIF.
+
+      READ TABLE materials INTO DATA(material)
+           WITH KEY material_id = item-MaterialId.
+      CHECK sy-subrc = 0.
+
+      " En un material de peso variable, registrar solo unidades no dice nada:
+      " 500 pollos pueden ser 550 kg o 950 kg. El peso es obligatorio.
+      IF material-catch_weight = abap_true AND item-WeightReceived <= 0.
+        APPEND VALUE #( %tky = item-%tky ) TO failed-item.
+        APPEND VALUE #( %tky                    = item-%tky
+                        %path                   = VALUE #( receipt-%tky = VALUE #(
+                                                    %key-ReceiptUuid = item-ReceiptUuid
+                                                    %is_draft        = item-%is_draft ) )
+                        %state_area             = 'VALIDATE_QUANTITIES'
+                        %element-WeightReceived = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Doble unidad de medida: peso obligatorio| ) )
+               TO reported-item.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD validateWeightPlausibility.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( MaterialId QtyReceived WeightReceived WeightUnit ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    CHECK items IS NOT INITIAL.
+
+    SELECT material_id, material_name, weight_per_unit_min, weight_per_unit_max
+      FROM zgr_material
+      FOR ALL ENTRIES IN @items
+      WHERE material_id = @items-MaterialId
+      INTO TABLE @DATA(materials).
+
+    LOOP AT items INTO DATA(item).
+
+      APPEND VALUE #( %tky       = item-%tky
+                      %path      = VALUE #( receipt-%tky = VALUE #(
+                                     %key-ReceiptUuid = item-ReceiptUuid
+                                     %is_draft        = item-%is_draft ) )
+                      %state_area = 'VALIDATE_PLAUSIBILITY' ) TO reported-item.
+
+      READ TABLE materials INTO DATA(material)
+           WITH KEY material_id = item-MaterialId.
+      CHECK sy-subrc = 0.
+
+      DATA(check_result) = zcl_gr_weight_check=>check(
+                             quantity_units = CONV #( item-QtyReceived )
+                             total_weight   = CONV #( item-WeightReceived )
+                             min_per_unit   = CONV #( material-weight_per_unit_min )
+                             max_per_unit   = CONV #( material-weight_per_unit_max ) ).
+
+      CHECK check_result-is_plausible = abap_false.
+
+      " Esto no es una desviacion: es un error de bascula o de conteo, y solo
+      " se puede detectar en el momento de la entrada.
+      DATA(detail) = COND string(
+        WHEN check_result-verdict = zcl_gr_weight_check=>verdict-below_min
+          THEN |min { material-weight_per_unit_min }|
+        ELSE |max { material-weight_per_unit_max }| ).
+
+      APPEND VALUE #( %tky = item-%tky ) TO failed-item.
+      APPEND VALUE #( %tky                    = item-%tky
+                      %path                   = VALUE #( receipt-%tky = VALUE #(
+                                                  %key-ReceiptUuid = item-ReceiptUuid
+                                                  %is_draft        = item-%is_draft ) )
+                      %state_area             = 'VALIDATE_PLAUSIBILITY'
+                      %element-QtyReceived    = if_abap_behv=>mk-on
+                      %element-WeightReceived = if_abap_behv=>mk-on
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Peso medio { check_result-average_weight } | &&
+                                          |{ item-WeightUnit }, { detail }| ) )
+             TO reported-item.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD validateBatchQuantities.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item
+        FIELDS ( QtyReceived WeightReceived BaseUnit WeightUnit ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(items).
+
+    CHECK items IS NOT INITIAL.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Item BY \_Batch
+        FIELDS ( QtyUnits QtyWeight )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(batches)
+      LINK DATA(batch_links).
+
+    LOOP AT items INTO DATA(item).
+
+      APPEND VALUE #( %tky       = item-%tky
+                      %path      = VALUE #( receipt-%tky = VALUE #(
+                                     %key-ReceiptUuid = item-ReceiptUuid
+                                     %is_draft        = item-%is_draft ) )
+                      %state_area = 'VALIDATE_BATCH_QTY' ) TO reported-item.
+
+      " Sin lotes no hay nada que cuadrar: el lote se informa despues
+      IF batch_links IS INITIAL.
+        CONTINUE.
+      ENDIF.
+
+      DATA(total_units)  = VALUE zgr_batch-qty_units( ).
+      DATA(total_weight) = VALUE zgr_batch-qty_weight( ).
+      DATA(has_batches)  = abap_false.
+
+      LOOP AT batch_links INTO DATA(link) WHERE source-%tky = item-%tky.
+        READ TABLE batches INTO DATA(batch) WITH KEY %tky = link-target-%tky.
+        CHECK sy-subrc = 0.
+        has_batches  = abap_true.
+        total_units  = total_units  + batch-QtyUnits.
+        total_weight = total_weight + batch-QtyWeight.
+      ENDLOOP.
+
+      CHECK has_batches = abap_true.
+
+      IF total_units <> item-QtyReceived OR total_weight <> item-WeightReceived.
+        APPEND VALUE #( %tky = item-%tky ) TO failed-item.
+        APPEND VALUE #( %tky        = item-%tky
+                        %path       = VALUE #( receipt-%tky = VALUE #(
+                                        %key-ReceiptUuid = item-ReceiptUuid
+                                        %is_draft        = item-%is_draft ) )
+                        %state_area = 'VALIDATE_BATCH_QTY'
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Lotes { total_units }/{ total_weight } | &&
+                                            |vs posicion { item-QtyReceived }/{ item-WeightReceived }| ) )
+               TO reported-item.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -262,6 +559,12 @@ CLASS lhc_Batch DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS calculateExpiryDate FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Batch~calculateExpiryDate.
+
+    METHODS validateExpiryDate FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Batch~validateExpiryDate.
+
+    METHODS validateSupplierBatch FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Batch~validateSupplierBatch.
 
 ENDCLASS.
 
@@ -387,6 +690,167 @@ CLASS lhc_Batch IMPLEMENTATION.
 
   ENDMETHOD.
 
-ENDCLASS.
+  METHOD validateExpiryDate.
 
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        FIELDS ( ProductionDate ExpiryDate ItemUuid ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(batches).
+
+    CHECK batches IS NOT INITIAL.
+
+    " La fecha de recepcion vive en la cabecera
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch BY \_Receipt
+        FIELDS ( ReceiptDate )
+        WITH CORRESPONDING #( batches )
+      RESULT DATA(receipts)
+      LINK DATA(receipt_links).
+
+    " La vida util y el minimo exigido son datos del material, en la posicion
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch BY \_Item
+        FIELDS ( MaterialId )
+        WITH CORRESPONDING #( batches )
+      RESULT DATA(items)
+      LINK DATA(item_links).
+
+    CHECK items IS NOT INITIAL.
+
+    SELECT material_id, material_name, shelf_life_days, min_shelf_life_pct
+      FROM zgr_material
+      FOR ALL ENTRIES IN @items
+      WHERE material_id = @items-MaterialId
+      INTO TABLE @DATA(materials).
+
+    LOOP AT batches INTO DATA(batch).
+
+      APPEND VALUE #( %tky = batch-%tky
+                      %path = VALUE #( receipt-%tky = VALUE #( %key-ReceiptUuid = batch-ReceiptUuid
+                                                               %is_draft        = batch-%is_draft )
+                                       item-%tky    = VALUE #( %key-ItemUuid    = batch-ItemUuid
+                                                               %is_draft        = batch-%is_draft ) )
+                      %state_area = 'VALIDATE_EXPIRY' ) TO reported-batch.
+
+      READ TABLE item_links INTO DATA(item_link) WITH KEY source-%tky = batch-%tky.
+      CHECK sy-subrc = 0.
+      READ TABLE items INTO DATA(item) WITH KEY %tky = item_link-target-%tky.
+      CHECK sy-subrc = 0.
+      READ TABLE materials INTO DATA(material) WITH KEY material_id = item-MaterialId.
+      CHECK sy-subrc = 0.
+
+      READ TABLE receipt_links INTO DATA(receipt_link) WITH KEY source-%tky = batch-%tky.
+      CHECK sy-subrc = 0.
+      READ TABLE receipts INTO DATA(receipt) WITH KEY %tky = receipt_link-target-%tky.
+      CHECK sy-subrc = 0.
+
+      DATA(evaluation) = zcl_gr_shelf_life=>evaluate(
+                           production_date = batch-ProductionDate
+                           receipt_date    = receipt-ReceiptDate
+                           shelf_life_days = material-shelf_life_days
+                           min_percent     = CONV #( material-min_shelf_life_pct ) ).
+
+      IF evaluation-is_expired = abap_true.
+        APPEND VALUE #( %tky = batch-%tky ) TO failed-batch.
+        APPEND VALUE #( %tky                    = batch-%tky
+                        %path = VALUE #( receipt-%tky = VALUE #( %key-ReceiptUuid = batch-ReceiptUuid
+                                                               %is_draft        = batch-%is_draft )
+                                       item-%tky    = VALUE #( %key-ItemUuid    = batch-ItemUuid
+                                                               %is_draft        = batch-%is_draft ) )
+                        %state_area             = 'VALIDATE_EXPIRY'
+                        %element-ProductionDate = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Lote caducado el { evaluation-expiry_date DATE = USER }| ) )
+               TO reported-batch.
+        CONTINUE.
+      ENDIF.
+
+      " No basta con que no este caducado: se pacta un porcentaje minimo de
+      " vida util restante en el momento de la entrega.
+      IF evaluation-is_acceptable = abap_false.
+        APPEND VALUE #( %tky = batch-%tky ) TO failed-batch.
+        APPEND VALUE #( %tky                    = batch-%tky
+                        %path = VALUE #( receipt-%tky = VALUE #( %key-ReceiptUuid = batch-ReceiptUuid
+                                                               %is_draft        = batch-%is_draft )
+                                       item-%tky    = VALUE #( %key-ItemUuid    = batch-ItemUuid
+                                                               %is_draft        = batch-%is_draft ) )
+                        %state_area             = 'VALIDATE_EXPIRY'
+                        %element-ProductionDate = if_abap_behv=>mk-on
+                        %msg = new_message_with_text(
+                                 severity = if_abap_behv_message=>severity-error
+                                 text     = |Vida util { evaluation-remaining_days } dias, | &&
+                                            |minimo exigido { evaluation-required_days }| ) )
+               TO reported-batch.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD validateSupplierBatch.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch
+        FIELDS ( SupplierBatch ItemUuid ReceiptUuid )
+        WITH CORRESPONDING #( keys )
+      RESULT DATA(batches).
+
+    CHECK batches IS NOT INITIAL.
+
+    READ ENTITIES OF zr_grreceipttp IN LOCAL MODE
+      ENTITY Batch BY \_Item
+        FIELDS ( MaterialId )
+        WITH CORRESPONDING #( batches )
+      RESULT DATA(items)
+      LINK DATA(item_links).
+
+    CHECK items IS NOT INITIAL.
+
+    SELECT material_id, material_name, batch_managed
+      FROM zgr_material
+      FOR ALL ENTRIES IN @items
+      WHERE material_id = @items-MaterialId
+      INTO TABLE @DATA(materials).
+
+    LOOP AT batches INTO DATA(batch).
+
+      APPEND VALUE #( %tky = batch-%tky
+                      %path = VALUE #( receipt-%tky = VALUE #( %key-ReceiptUuid = batch-ReceiptUuid
+                                                               %is_draft        = batch-%is_draft )
+                                       item-%tky    = VALUE #( %key-ItemUuid    = batch-ItemUuid
+                                                               %is_draft        = batch-%is_draft ) )
+                      %state_area = 'VALIDATE_SUPPLIER_BATCH' ) TO reported-batch.
+
+      CHECK batch-SupplierBatch IS INITIAL.
+
+      READ TABLE item_links INTO DATA(link) WITH KEY source-%tky = batch-%tky.
+      CHECK sy-subrc = 0.
+      READ TABLE items INTO DATA(item) WITH KEY %tky = link-target-%tky.
+      CHECK sy-subrc = 0.
+      READ TABLE materials INTO DATA(material) WITH KEY material_id = item-MaterialId.
+      CHECK sy-subrc = 0 AND material-batch_managed = abap_true.
+
+      " Sin lote de proveedor la cadena de trazabilidad se rompe por el
+      " extremo de origen: una retirada de producto no se podria acotar.
+      APPEND VALUE #( %tky = batch-%tky ) TO failed-batch.
+      APPEND VALUE #( %tky                   = batch-%tky
+                      %path = VALUE #( receipt-%tky = VALUE #( %key-ReceiptUuid = batch-ReceiptUuid
+                                                               %is_draft        = batch-%is_draft )
+                                       item-%tky    = VALUE #( %key-ItemUuid    = batch-ItemUuid
+                                                               %is_draft        = batch-%is_draft ) )
+                      %state_area            = 'VALIDATE_SUPPLIER_BATCH'
+                      %element-SupplierBatch = if_abap_behv=>mk-on
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Material por lote: lote proveedor obligatorio| ) )
+             TO reported-batch.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
 
