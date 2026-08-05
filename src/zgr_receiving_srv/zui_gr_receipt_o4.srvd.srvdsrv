@@ -1,0 +1,9 @@
+@EndUserText.label: 'Entrada de mercancia con lote y 2 unidad'
+define service ZUI_GR_RECEIPT_O4 {
+  expose ZC_GRReceiptTP       as Receipt;
+  expose ZC_GRItemTP          as Item;
+  expose ZC_GRBatchTP         as Batch;
+  expose ZI_GRMaterial        as Material;
+  expose ZI_GRSupplier        as Supplier;
+  expose ZI_GRDeviationReason as DeviationReason;
+}

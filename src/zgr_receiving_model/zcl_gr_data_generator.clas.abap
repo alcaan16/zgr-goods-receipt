@@ -45,12 +45,16 @@ CLASS zcl_gr_data_generator IMPLEMENTATION.
 
 
   METHOD clear_all.
+    DELETE FROM zgr_batch_d.
+    DELETE FROM zgr_rec_item_d.
+    DELETE FROM zgr_receipt_d.
     DELETE FROM zgr_batch.
     DELETE FROM zgr_rec_item.
     DELETE FROM zgr_receipt.
     DELETE FROM zgr_material.
     DELETE FROM zgr_supplier.
     DELETE FROM zgr_dev_reason.
+
     COMMIT WORK.
   ENDMETHOD.
 

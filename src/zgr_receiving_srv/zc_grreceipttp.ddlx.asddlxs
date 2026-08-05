@@ -1,0 +1,74 @@
+@Metadata.layer: #CORE
+
+@UI: {
+  headerInfo: {
+    typeName: 'Entrada de mercancia',
+    typeNamePlural: 'Entradas de mercancia',
+    title:       { type: #STANDARD, value: 'ReceiptNumber' },
+    description: { type: #STANDARD, value: 'DeliveryNote' }
+  }
+}
+annotate entity ZC_GRReceiptTP with
+{
+  @UI.facet: [
+    { id: 'General',  purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE,
+      label: 'Datos generales', position: 10 },
+    { id: 'Items',    purpose: #STANDARD, type: #LINEITEM_REFERENCE,
+      label: 'Posiciones', position: 20, targetElement: '_Item' }
+  ]
+
+  @UI.hidden: true
+  ReceiptUuid;
+
+  @UI: { lineItem:       [ { position: 10, label: 'Nº entrada' } ],
+         identification: [ { position: 10, label: 'Nº entrada' } ],
+         selectionField: [ { position: 10 } ] }
+  ReceiptNumber;
+
+  @UI: { lineItem:       [ { position: 20, label: 'Proveedor' } ],
+         identification: [ { position: 20, label: 'Proveedor' } ],
+         selectionField: [ { position: 20 } ] }
+  SupplierId;
+
+  @UI.hidden: true
+  SupplierName;
+
+  @UI: { lineItem:       [ { position: 30, label: 'Albaran' } ],
+         identification: [ { position: 30, label: 'Albaran' } ],
+         selectionField: [ { position: 30 } ] }
+  DeliveryNote;
+
+  @UI: { lineItem:       [ { position: 40, label: 'Fecha recepcion' } ],
+         identification: [ { position: 40, label: 'Fecha recepcion' } ] }
+  ReceiptDate;
+
+  @UI: { identification: [ { position: 50, label: 'Centro' } ] }
+  PlantId;
+
+  @UI: { lineItem:       [ { position: 60, label: 'Estado' } ],
+         identification: [ { position: 60, label: 'Estado' } ] }
+  OverallStatus;
+
+  @UI: { lineItem:       [ { position: 70, label: 'Total unidades' } ],
+         identification: [ { position: 70, label: 'Total unidades' } ] }
+  TotalQuantity;
+
+  @UI: { lineItem:       [ { position: 80, label: 'Total peso' } ],
+         identification: [ { position: 80, label: 'Total peso' } ] }
+  TotalWeight;
+
+  @UI.hidden: true
+  TotalUnit;
+  @UI.hidden: true
+  WeightUnit;
+  @UI.hidden: true
+  CreatedBy;
+  @UI.hidden: true
+  CreatedAt;
+  @UI.hidden: true
+  LastChangedBy;
+  @UI.hidden: true
+  LastChangedAt;
+  @UI.hidden: true
+  LocalLastChangedAt;
+}

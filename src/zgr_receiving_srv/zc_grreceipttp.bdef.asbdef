@@ -1,0 +1,37 @@
+projection;
+strict ( 2 );
+use draft;
+
+define behavior for ZC_GRReceiptTP alias Receipt
+{
+  use create;
+  use update;
+  use delete;
+
+  use association _Item { create; with draft; }
+
+  use action Activate;
+  use action Discard;
+  use action Edit;
+  use action Resume;
+  use action Prepare;
+}
+
+define behavior for ZC_GRItemTP alias Item
+{
+  use update;
+  use delete;
+
+  use association _Receipt { with draft; }
+  use association _Batch { create; with draft; }
+}
+
+define behavior for ZC_GRBatchTP alias Batch
+{
+  use update;
+  use delete;
+
+  use association _Item { with draft; }
+  use association _Receipt { with draft; }
+
+}

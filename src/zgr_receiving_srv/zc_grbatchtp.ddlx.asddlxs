@@ -1,0 +1,59 @@
+@Metadata.layer: #CORE
+
+@UI: {
+  headerInfo: {
+    typeName: 'Lote',
+    typeNamePlural: 'Lotes',
+    title:       { type: #STANDARD, value: 'BatchNumber' },
+    description: { type: #STANDARD, value: 'SupplierBatch' }
+  }
+}
+annotate entity ZC_GRBatchTP with
+{
+  @UI.facet: [
+    { id: 'General', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE,
+      label: 'Detalle de lote', position: 10 }
+  ]
+
+  @UI.hidden: true
+  BatchUuid;
+  @UI.hidden: true
+  ItemUuid;
+  @UI.hidden: true
+  ReceiptUuid;
+
+  @UI: { lineItem:       [ { position: 10, label: 'Lote interno' } ],
+         identification: [ { position: 10, label: 'Lote interno' } ] }
+  BatchNumber;
+
+  @UI: { lineItem:       [ { position: 20, label: 'Lote proveedor' } ],
+         identification: [ { position: 20, label: 'Lote proveedor' } ] }
+  SupplierBatch;
+
+  @UI: { lineItem:       [ { position: 30, label: 'Fecha produccion' } ],
+         identification: [ { position: 30, label: 'Fecha produccion' } ] }
+  ProductionDate;
+
+  @UI: { lineItem:       [ { position: 40, label: 'Caducidad' } ],
+         identification: [ { position: 40, label: 'Caducidad' } ] }
+  ExpiryDate;
+
+  @UI: { lineItem:       [ { position: 50, label: 'Unidades' } ],
+         identification: [ { position: 50, label: 'Unidades' } ] }
+  QtyUnits;
+
+  @UI: { lineItem:       [ { position: 60, label: 'Peso' } ],
+         identification: [ { position: 60, label: 'Peso' } ] }
+  QtyWeight;
+
+  @UI: { lineItem:       [ { position: 70, label: 'Estado' } ],
+         identification: [ { position: 70, label: 'Estado' } ] }
+  BatchStatus;
+
+  @UI.hidden: true
+  BaseUnit;
+  @UI.hidden: true
+  WeightUnit;
+  @UI.hidden: true
+  LocalLastChangedAt;
+}

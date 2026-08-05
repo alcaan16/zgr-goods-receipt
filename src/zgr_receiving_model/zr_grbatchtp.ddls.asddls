@@ -6,10 +6,16 @@ define view entity ZR_GRBatchTP
 
   association to parent ZR_GRItemTP as _Item
     on $projection.ItemUuid = _Item.ItemUuid
+
+  // Asociacion directa a la raiz: RAP exige que lock y authorization
+  // dependent apunten al lock master, no al padre inmediato.
+  association [1..1] to ZR_GRReceiptTP as _Receipt
+    on $projection.ReceiptUuid = _Receipt.ReceiptUuid
 {
   key batch_uuid            as BatchUuid,
 
       item_uuid             as ItemUuid,
+      receipt_uuid          as ReceiptUuid,
 
       // Lote interno de fabrica: AAAAMMDD + secuencial
       batch_number          as BatchNumber,
@@ -32,5 +38,6 @@ define view entity ZR_GRBatchTP
       @Semantics.systemDateTime.localInstanceLastChangedAt: true
       local_last_changed_at as LocalLastChangedAt,
 
-      _Item
+      _Item,
+      _Receipt
 }

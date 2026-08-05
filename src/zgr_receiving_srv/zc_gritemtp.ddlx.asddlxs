@@ -1,0 +1,76 @@
+@Metadata.layer: #CORE
+
+@UI: {
+  headerInfo: {
+    typeName: 'Posicion',
+    typeNamePlural: 'Posiciones',
+    title:       { type: #STANDARD, value: 'ItemNumber' },
+    description: { type: #STANDARD, value: 'MaterialId' }
+  }
+}
+annotate entity ZC_GRItemTP with
+{
+  @UI.facet: [
+    { id: 'General', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE,
+      label: 'Detalle de posicion', position: 10 },
+    { id: 'Batches', purpose: #STANDARD, type: #LINEITEM_REFERENCE,
+      label: 'Lotes', position: 20, targetElement: '_Batch' }
+  ]
+
+  @UI.hidden: true
+  ItemUuid;
+  @UI.hidden: true
+  ReceiptUuid;
+
+  @UI: { lineItem:       [ { position: 10, label: 'Pos.' } ],
+         identification: [ { position: 10, label: 'Pos.' } ] }
+  ItemNumber;
+
+  @UI: { lineItem:       [ { position: 20, label: 'Material' } ],
+         identification: [ { position: 20, label: 'Material' } ] }
+  MaterialId;
+
+  @UI.hidden: true
+  MaterialName;
+
+  @UI: { identification: [ { position: 30, label: 'Unidades albaran' } ] }
+  QtyExpected;
+
+  @UI: { identification: [ { position: 40, label: 'Peso albaran' } ] }
+  WeightExpected;
+
+  @UI: { lineItem:       [ { position: 50, label: 'Unidades recibidas' } ],
+         identification: [ { position: 50, label: 'Unidades recibidas' } ] }
+  QtyReceived;
+
+  @UI: { lineItem:       [ { position: 60, label: 'Peso recibido' } ],
+         identification: [ { position: 60, label: 'Peso recibido' } ] }
+  WeightReceived;
+
+  @UI: { lineItem:       [ { position: 70, label: 'Desviacion peso' } ],
+         identification: [ { position: 70, label: 'Desviacion peso' } ] }
+  WeightDeviation;
+
+  @UI: { lineItem:       [ { position: 80, label: 'Desviacion %' } ],
+         identification: [ { position: 80, label: 'Desviacion %' } ] }
+  DeviationPct;
+
+  @UI: { identification: [ { position: 90, label: 'Motivo' } ] }
+  DeviationReason;
+
+  @UI: { identification: [ { position: 100, label: 'Observacion' } ] }
+  DeviationNote;
+
+  @UI: { lineItem:       [ { position: 110, label: 'Estado' } ],
+         identification: [ { position: 110, label: 'Estado' } ] }
+  ItemStatus;
+
+  @UI.hidden: true
+  QtyDeviation;
+  @UI.hidden: true
+  BaseUnit;
+  @UI.hidden: true
+  WeightUnit;
+  @UI.hidden: true
+  LocalLastChangedAt;
+}
