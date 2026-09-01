@@ -1,3 +1,6 @@
+#### Parte de un portfolio de tres proyectos sobre el mismo hilo funcional — recepción → lote → FEFO → alerta de caducidad. Ver el conjunto en [alcaan16.es](https://alcaan16.es/)
+---
+
 # Entrada de mercancía con gestión de lote y doble unidad de medida
 
 Business object **RAP** sobre **SAP BTP ABAP Environment** que modela la recepción de mercancía en
