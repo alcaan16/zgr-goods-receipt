@@ -59,7 +59,7 @@ Entrada de mercancía  (raíz, lock master, draft)
 
 ## 3. Las reglas que hacen que esto no sea un tutorial
 
-Seis determinations y siete validations. Estas cuatro son las que salen de haber estado delante de
+Siete determinations y siete validations. Estas cuatro son las que salen de haber estado delante de
 la báscula, no de un manual:
 
 ### Plausibilidad del peso medio por pieza
