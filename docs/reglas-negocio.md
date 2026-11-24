@@ -59,7 +59,7 @@ la posición. Si no cuadra, hay mercancía sin asignar a ningún lote.
 | `setReceiptNumber` | on save, create | Número de entrada correlativo |
 | `setItemNumber` | on modify, create | Número de posición, de 10 en 10 |
 | `setInitialStatus` | on modify, create | Estado `1` Borrador |
-| `calculateInternalBatchCode` | on modify, create de lote | `AAAAMMDD` + secuencial del día |
+| `calculateBatchCode` | on modify, create de lote | `AAAAMMDD` + secuencial del día |
 | `calculateExpiryDate` | on modify, create/update de fecha de producción | `ProductionDate + ShelfLifeDays` |
 | `calculateDeviation` | on modify, create/update de cantidades | Desviación en unidades, en kg y en % |
 | `calculateHeaderTotals` | on modify sobre posición y lote | Totales de cabecera en las dos unidades |
